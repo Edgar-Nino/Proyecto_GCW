@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<script src="js/lib.js"></script>
+<script type="module">
+    import * as THREE from './node_modules/three/build/three.module.js';
+    import { DRACOLoader } from './node_modules/three/examples/jsm/loaders/DRACOLoader.js';
+    import { GLTFLoader } from './node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+    import { LightProbeGenerator } from './node_modules/three/examples/jsm/lights/LightProbeGenerator.js';
+
+    let camera, scene, renderer;
+    let geometry, material, mesh;
+
+    var mouseClick = false;
+
+    var loader;
+
+    var clock;
+    var deltaTime;
+
+    var envtexture;
+    var lightprobe;
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2(1, 1);
+
+    var collisionObj = [];
+    var loadObj = [];
+    var keys = {};
+
+    var mixer;
+
+    var levelSelected = 'E';
+
+    init().catch(e => {
+        console.log(e);
+    })
+
+    async function init() {
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        clock = new THREE.Clock();
+
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 5.8, 12);
+        camera.position.z = 10;
+
+        scene = new THREE.Scene();
+
+        geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+        material = new THREE.MeshNormalMaterial();
+
+        mesh = new THREE.Mesh(geometry, material);
+
+        lightprobe = new THREE.LightProbe();
+        scene.add(lightprobe)
+
+
+        loader = new GLTFLoader();
+
+        if (levelSelected == "E") {
+            var urls = genCubeUrls('./CubeMaps/Estadio/', '.png');
+            createCubeTexture(urls)
+
+            var soccer = await loadGLTFAsync("./models/Estadio/Soccer/SoccerA.glb")
+            traverse(soccer);
+            var basketball = await loadGLTFAsync("./models/Estadio/Basketball/BasketballA.glb")
+            traverse(basketball);
+            var baseball = await loadGLTFAsync("./models/Estadio/Baseball/BaseballA.glb")
+            traverse(baseball);
+            var boliche = await loadGLTFAsync("./models/Estadio/Boliche/Boliche.glb")
+            traverse(boliche);
+        }
+
+        animate();
+
+        window.addEventListener('resize', onWindowResize, false);
+        document.addEventListener('mousemove', onMouseMove, false);
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
+        document.addEventListener('mousedown', mouseClickOn);
+        document.addEventListener('mouseup', mouseClickOff);
+    }
+
+    function animate() {
+        deltaTime = clock.getDelta();
+        requestAnimationFrame(animate);
+
+        if (keys["A"]) {
+        }
+        UpdateBalls();
+        Collision();
+        renderer.render(scene, camera);
+
+    }
+
+    function onMouseMove(event) {
+
+        event.preventDefault();
+
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+    }
+    function Collision() {
+        if (mouseClick) {
+            raycaster.setFromCamera(mouse, camera);
+
+            const collision = raycaster.intersectObjects(collisionObj, true);
+
+            if (collision.length > 0) {
+
+                collision[0].object.parent.parent.userData.VelocidadX = 0;
+
+                // mesh.setColorAt(instanceId, color.setHex(Math.random() * 0xffffff));
+                // mesh.instanceColor.needsUpdate = true;
+
+            }
+        }
+    }
+
+    function loadGLTF(path, onLoadCallback) {
+
+        new GLTFLoader().load(path, function (gltf) {
+            var model = gltf.scene;
+            onLoadCallback(model)
+
+
+        });
+    }
+
+    function loadGLTFAsync(path) {
+        return new Promise((resolve, reject) => {
+            loader.load(path, data => resolve(data), null, reject)
+        })
+    }
+
+    function traverse(data) {
+        data.scene.traverse(function (child) {
+            if (child.isMesh) {
+                child.material.envMap = envtexture;
+                child.material.envMapIntensity = 5;
+            }
+        })
+        loadObj.push(data);
+    }
+
+
+    function onWindowResize() {
+
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        animate();
+
+    }
+
+    function onKeyDown(event) {
+        keys[String.fromCharCode(event.keyCode)] = true;
+    }
+    function onKeyUp(event) {
+        keys[String.fromCharCode(event.keyCode)] = false;
+
+        var code = event.keyCode;
+        if (code == 32) {//Space bar 
+            GenerateBalls();
+        }
+    }
+    function mouseClickOn() {
+        event.preventDefault();
+        mouseClick = true;
+    }
+
+    function mouseClickOff() {
+        event.preventDefault();
+        mouseClick = false;
+    }
+
+    function GenerateBalls() {
+        var numBall = Math.floor(Math.random() * 4);
+        var Smodel = loadObj[numBall].scene;
+
+        Smodel.scale.x = 2
+        Smodel.scale.y = 2
+        Smodel.scale.z = 2
+
+        var mesh = Smodel.clone();
+
+        let fileAnimations = loadObj[0].animations;
+        let anim = fileAnimations[0];
+
+        mesh.userData.mixer = new THREE.AnimationMixer(mesh);
+        var actionL = mesh.userData.mixer.clipAction(loadObj[numBall].animations[0]);
+        var actionR = mesh.userData.mixer.clipAction(loadObj[numBall].animations[1]);
+        actionL.play();
+        actionR.play();
+
+
+        mesh.userData.direction = (getRandomArbitrary(-1, 1) > 0) ? 1 : -1;
+        mesh.userData.VelocidadX = mesh.userData.direction * (7 + getRandomArbitrary(0, 7));
+        mesh.userData.initialX = getRandomArbitrary(0, 5);
+        mesh.userData.initialY = getRandomArbitrary(0, 10);
+        mesh.userData.initialG = 0;
+        mesh.userData.planar = getRandomArbitrary(0, 30);
+        mesh.position.x = mesh.userData.direction * (-15 + mesh.userData.initialX);
+        mesh.position.y = -8 - mesh.userData.initialY;
+        mesh.position.z += getRandomArbitrary(-2, 2);
+
+        collisionObj.push(mesh)
+        scene.add(mesh)
+    }
+
+    function UpdateBalls() {
+        collisionObj.map(data => {
+
+            let value = MapRange(data.position.x, -15, 15, -1, 1)
+
+            data.rotation.z += THREE.Math.degToRad(- deltaTime * data.userData.VelocidadX * 15);
+            data.position.x += deltaTime * data.userData.VelocidadX;
+
+
+            if (data.userData.VelocidadX == 0) {
+                data.userData.initialG += deltaTime * .9;
+                data.position.x += data.userData.direction * deltaTime * 10;
+                data.position.y += -Math.pow(data.userData.initialG, 2);
+                data.position.y -= deltaTime * 5;
+                data.userData.mixer.update(deltaTime);
+            } else {
+                data.position.y = (Math.pow(data.position.x + data.userData.initialX, 2) / (-14 - data.userData.planar)) + 8 - data.userData.initialY;
+            }
+        })
+    }
+
+    function createCubeTexture(urlCube) {
+        new THREE.CubeTextureLoader().load(urlCube, function (cubeTexture) {
+
+            cubeTexture.encoding = THREE.sRGBEncoding;
+
+            scene.background = cubeTexture;
+
+            lightprobe.copy(LightProbeGenerator.fromCubeTexture(cubeTexture));
+
+            envtexture = cubeTexture;
+        });
+    }
+
+</script>
+
+<body>
+
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+
+</body>
+
+</html>
