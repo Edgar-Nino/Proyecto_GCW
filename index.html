@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avance</title>
+
+    <link rel="shortcut icon" href="./img/Menu/SlashIt.jpg">
+
+    <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/main.css">
+
+    <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="./node_modules/jquery-ui/jquery-ui.js"></script>
+    <script src="./node_modules/@popperjs/core/lib/"></script>
+    <script src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+
+            $("#BConfiguracion").click(function () {
+                $("#ConfiguracionModal").modal('toggle');
+            });
+
+            $(".tog").click(function () {
+                $(this).find('img').toggle();
+            })
+
+            $("#BUnJugador").click(function () {
+                $("#Inicio").slideToggle('10', "swing");
+                $("#LevelSelector").slideToggle('10', "swing");
+                $("#footer").fadeIn();
+            });
+
+            $("#BHighScore").click(function () {
+                $("#Inicio").slideToggle('10', "swing");
+                $("#HighScores").slideToggle('10', "swing");
+                $("#footer").fadeIn();
+            });
+
+            $(".cross").click(function () {
+                $("#LevelSelector").slideUp();
+                $("#Inicio").slideDown();
+                $("#HighScores").slideUp();
+                $("#footer").fadeOut();
+            });
+
+            $(document).on('keyup', function (evt) {
+                if (evt.keyCode == 27) {
+                    $("#LevelSelector").slideUp();
+                    $("#Inicio").slideDown();
+                    $("#HighScores").slideUp();
+                    $("#ConfiguracionModal").modal('hide');
+                }
+            });
+
+            $(document).on('keyup', function (evt) {
+                if (evt.keyCode == 80) {
+                    $("#Pausa").modal('toggle');
+                }
+            });
+
+        })
+
+    </script>
+
+</head>
+
+<body class="p-0 m-0 ">
+    <div id="Inicio" style="height: 100vh;" class="row m-0 p-0">
+        <div class="col-6 h-100">
+            <div class="row h-25">
+                <div class="col-12 align-self-center text-center">
+                    <button id="BUnJugador" class="shadow-lg inicio btn btn-warning"></button>
+                </div>
+            </div>
+            <div class="row h-25">
+                <div class="col-12 align-self-center text-center">
+                    <button id="BMultijugador" class="shadow-lg inicio btn btn-warning"></button>
+                </div>
+            </div>
+            <div class="row h-25">
+                <div class="col-12 align-self-center text-center">
+                    <button id="BHighScore" class="shadow-lg inicio btn btn-warning"></button>
+                </div>
+            </div>
+            <div class="row h-25">
+                <div class="col-12 align-self-center text-center">
+                    <button id="BConfiguracion" class="shadow-lg inicio btn btn-warning"></button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6">
+            <div class="row align-self-center text-center h-100">
+                <img id="logo" src="./img/Menu/SlashIt.svg" draggable="false" class="w-100" alt="">
+            </div>
+        </div>
+    </div>
+
+    <div id="LevelSelector" style="background-color: black; height: 100vh; display: none;" class="row m-0 p-0">
+        <div id="L_Isla" class="levels col-4"></div>
+        <div id="L_Estadio" class="levels col-4"></div>
+        <div id="L_Dulceria" class="levels col-4"></div>
+    </div>
+
+    <div id="HighScores" style="background-color: rgba(255, 255, 255, 0.685); height: 100vh; display: none;"
+        class="m-0 p-0">
+        <div class="m-0 p-0">
+            <p style="font-size: 100px; background-color: rgba(115, 115, 255, 0.678);" class="text-center">HIGH-SCORES
+            </p>
+            <table class="mx-auto table table-dark h-100 w-50 m-0 p-0">
+                <tr>
+                    <th>Nombre</th>
+                    <th>Puntuaje</th>
+                    <th>Fecha</th>
+                </tr>
+                <tr>
+                    <td>EDG</td>
+                    <td>100</td>
+                    <td>2020/12/03</td>
+                </tr>
+                <tr>
+                    <td>EDG</td>
+                    <td>100</td>
+                    <td>2020/12/03</td>
+                </tr>
+                <tr>
+                    <td>EDG</td>
+                    <td>100</td>
+                    <td>2020/12/03</td>
+                </tr>
+                <tr>
+                    <td>EDG</td>
+                    <td>100</td>
+                    <td>2020/12/03</td>
+                </tr>
+                <tr>
+                    <td>EDG</td>
+                    <td>100</td>
+                    <td>2020/12/03</td>
+                </tr>
+                <tr>
+                    <td>EDG</td>
+                    <td>100</td>
+                    <td>2020/12/03</td>
+                </tr>
+                <tr>
+                    <td>EDG</td>
+                    <td>100</td>
+                    <td>2020/12/03</td>
+                </tr>
+                <tr>
+                    <td>EDG</td>
+                    <td>100</td>
+                    <td>2020/12/03</td>
+                </tr>
+                <tr>
+                    <td>EDG</td>
+                    <td>100</td>
+                    <td>2020/12/03</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div id="footer" style="display: none; " class="fixed-bottom" class="">
+        <img src="./img/Menu/Cross.png" draggable="false" class="cross py-3 mx-auto d-block h-100" alt="">
+    </div>
+
+    <div class="modal fade" id="ConfiguracionModal" tabindex="-1" role="dialog"
+        aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered px-auto" role="document">
+            <div id="ConfiguracionDialog" class="modal-content">
+                <div class="modal-body">
+                    <span class="tog">
+                        <img src="./img/Menu/Sound.png" draggable="false" class="sButton h-100 w-100">
+                        <img src="./img/Menu/Mute.png" draggable="false" class="sButton h-100 w-100" style="display:none;">
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade"  id="Pausa" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered px-auto" role="document">
+            <div id="PausaDialog" class="modal-content m-0 p-0">
+                <div class="gradient modal-body p-0 rounded">
+                    <h1 style="background-color: rgba(159, 189, 255, 0.315); font-size: 50px;"
+                        class="text-center p-3 rounded">PAUSA</h1>
+                    <span class="tog">
+                        <img src="./img/Menu/Sound.png" draggable="false" class="sButton h-100 w-100">
+                        <img src="./img/Menu/Mute.png" draggable="false" class="sButton h-100 w-100" style="display:none;">
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+</body>
+
+</html>
