@@ -1,0 +1,163 @@
+body{
+    background-image: url("../img/Menu/Fondo.jpg") !important;
+}
+
+html, body {margin: 0; height: 100%; overflow: hidden}
+
+button.inicio{
+    height:190px;
+    width: 70%;
+    transition: .5s;
+    transition-timing-function: cubic-bezier(0.075, 0.82, 0.165, 1);
+    opacity: 90%;
+    border-color: inherit;
+    background-repeat: round;
+    
+}
+
+button.inicio:hover{
+    transform: scale3d(1.1,1.1,1.1);
+    opacity: 100%;
+    border: 1px;
+}
+
+button.inicio:active{
+    transform: translateY(8px);
+}
+
+#logo{
+    transition: 5s;
+    transition-timing-function: cubic-bezier(0.075, 0.82, 0.165, 1);
+    width: 75px;
+}
+
+#logo:hover{
+    transform: translateY(-30px);
+}
+
+#BUnJugador{
+    background-image: url("../img/Menu/UnJugador.jpg");
+}
+
+#BMultijugador{
+    background-image: url("../img/Menu/Multijugador.jpg");
+}
+
+#BHighScore{
+    background-image: url("../img/Menu/HighScores.jpg");
+}
+#BConfiguracion{
+    background-image: url("../img/Menu/Configuracion.jpg");
+}
+
+#ConfiguracionDialog{
+    background-image: url("../img/Menu/FondoModal.jpg");
+    height: 383px;
+    width: 766px;
+    background-repeat: round;
+}
+
+#BMute{
+    background-image: url("../img/Menu/Mute.jpg");
+}
+
+#BSound{
+    background-image: url("../img/Menu/Sound.jpg");
+}
+
+#L_Isla{
+    background-image: url("../img/Menu/Isla.jpg");
+    background-size: cover;
+}
+
+#L_Estadio{
+    background-image: url("../img/Menu/Estadio.jpg");
+    background-size: cover;
+}
+
+#L_Dulceria{
+    background-image: url("../img/Menu/Dulceria.jpg");
+    background-size: cover;
+}
+
+
+#footer {
+    background: linear-gradient(to bottom, #00000000 0%, #000000 100%);
+    height: 15vh;
+    opacity: 50%;
+    transition: 1s;
+    z-index: 1;
+}
+#footer:hover{
+    opacity: 100%;
+}
+#footer:hover .cross {
+    opacity: 50%;
+}
+
+.cross{
+    transition:1s;
+    opacity: 0%;
+    transform: scale3d(.5,.5,.5);
+}
+
+.cross:hover{
+    transform: translateY(-10px) scale3d(1,1,1);
+    cursor: pointer;
+
+    opacity: 100% !important;
+}
+
+.cross:active{
+    transform: scale3d(0.4,0.4,0.4);
+    opacity:0% !important;
+}
+
+.levels{
+    transition: 1s;
+    opacity: 30%;
+}
+
+td,th{
+    font-size: 30px;   
+}
+
+#LevelSelector:hover .levels{
+    opacity: 15% ;
+    transform: translateX(-32px);
+    filter: blur(2px);
+}
+
+#LevelSelector .levels:hover~.levels{
+    opacity: 15%;
+    transform: translateX(32px);
+    filter: blur(2px);
+}
+
+.levels:hover{
+    opacity: 100%!important;
+    filter: blur(0px)!important;
+    transform: scale3d(1.1,1.1,1.1) translateX(0px)!important;
+    z-index: 1;
+}
+
+.gradient {
+    background: linear-gradient(39deg, #ffe404, #ffcb98, #94ff98, #00a851, #ff5e5e, #ffffff);
+    background-size: 1200% 1200%;
+
+    animation: Gradient 15s linear infinite;
+}
+
+.sButton{
+    transition: 1s;
+}
+
+.sButton:hover, .sButton:active{
+    filter: drop-shadow(0px 0px 15px rgb(0, 0, 0));
+}
+
+@keyframes Gradient {
+    0%{background-position:94% 0%}
+    50%{background-position:7% 100%}
+    100%{background-position:94% 0%}
+}
