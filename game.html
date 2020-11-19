@@ -4,258 +4,451 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
-<script src="js/lib.js"></script>
-<script type="module">
-    import * as THREE from './node_modules/three/build/three.module.js';
-    import { DRACOLoader } from './node_modules/three/examples/jsm/loaders/DRACOLoader.js';
-    import { GLTFLoader } from './node_modules/three/examples/jsm/loaders/GLTFLoader.js';
-    import { LightProbeGenerator } from './node_modules/three/examples/jsm/lights/LightProbeGenerator.js';
+    <title>Slash IT</title>
+    <link rel="shortcut icon" href="./img/Menu/SlashIt.jpg">
 
-    let camera, scene, renderer;
-    let geometry, material, mesh;
+    <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css">
 
-    var mouseClick = false;
+    <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
 
-    var loader;
-
-    var clock;
-    var deltaTime;
-
-    var envtexture;
-    var lightprobe;
-
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2(1, 1);
-
-    var collisionObj = [];
-    var loadObj = [];
-    var keys = {};
-
-    var mixer;
-
-    var levelSelected = 'E';
-
-    init().catch(e => {
-        console.log(e);
-    })
-
-    async function init() {
-
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-
-        clock = new THREE.Clock();
-
-        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 5.8, 12);
-        camera.position.z = 10;
-
-        scene = new THREE.Scene();
-
-        geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-        material = new THREE.MeshNormalMaterial();
-
-        mesh = new THREE.Mesh(geometry, material);
-
-        lightprobe = new THREE.LightProbe();
-        scene.add(lightprobe)
+    <script src="https://www.gstatic.com/firebasejs/8.0.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.0.2/firebase-firestore.js"></script>
 
 
-        loader = new GLTFLoader();
+    <script src="js/lib.js"></script>
+    <script type="module">
+        import * as THREE from './node_modules/three/build/three.module.js';
+        import { DRACOLoader } from './node_modules/three/examples/jsm/loaders/DRACOLoader.js';
+        import { GLTFLoader } from './node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+        import { LightProbeGenerator } from './node_modules/three/examples/jsm/lights/LightProbeGenerator.js';
 
-        if (levelSelected == "E") {
-            var urls = genCubeUrls('./CubeMaps/Estadio/', '.png');
-            createCubeTexture(urls)
+        let camera, scene, renderer;
+        let geometry, material, mesh;
 
-            var soccer = await loadGLTFAsync("./models/Estadio/Soccer/SoccerA.glb")
-            traverse(soccer);
-            var basketball = await loadGLTFAsync("./models/Estadio/Basketball/BasketballA.glb")
-            traverse(basketball);
-            var baseball = await loadGLTFAsync("./models/Estadio/Baseball/BaseballA.glb")
-            traverse(baseball);
-            var boliche = await loadGLTFAsync("./models/Estadio/Boliche/Boliche.glb")
-            traverse(boliche);
-        }
+        var mouseClick = false;
+        var Pausa = false;
+        var loader;
 
-        animate();
+        var clock;
+        var deltaTime;
 
-        window.addEventListener('resize', onWindowResize, false);
-        document.addEventListener('mousemove', onMouseMove, false);
-        document.addEventListener('keydown', onKeyDown);
-        document.addEventListener('keyup', onKeyUp);
-        document.addEventListener('mousedown', mouseClickOn);
-        document.addEventListener('mouseup', mouseClickOff);
-    }
+        var envtexture;
+        var lightprobe;
 
-    function animate() {
-        deltaTime = clock.getDelta();
-        requestAnimationFrame(animate);
+        var puntuaje = 0;
 
-        if (keys["A"]) {
-        }
-        UpdateBalls();
-        Collision();
-        renderer.render(scene, camera);
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2(1, 1);
 
-    }
+        var collisionObj = [];
+        var loadObj = [];
+        var keys = {};
 
-    function onMouseMove(event) {
+        var intervalGB;
 
-        event.preventDefault();
+        var nickname = getUrlParameter("nickname");
+        var levelSelected = getUrlParameter("levelSelected");
+        var multijugador = getUrlParameter("multijugador");
+        var player = getUrlParameter("Player");
+        var idSala = getUrlParameter("SalaID");
+        var soundOnOff = (getUrlParameter("sound")=="on")?true:false;
 
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+        var vidaInicial = 4;
+        let secondsPass = 0;
 
-    }
-    function Collision() {
-        if (mouseClick) {
-            raycaster.setFromCamera(mouse, camera);
+        var s_Slash_1;
+        var s_Slash_2;
+        var s_Slash_3;
+        var s_Slash_4;
 
-            const collision = raycaster.intersectObjects(collisionObj, true);
-
-            if (collision.length > 0) {
-
-                collision[0].object.parent.parent.userData.VelocidadX = 0;
-
-                // mesh.setColorAt(instanceId, color.setHex(Math.random() * 0xffffff));
-                // mesh.instanceColor.needsUpdate = true;
-
-            }
-        }
-    }
-
-    function loadGLTF(path, onLoadCallback) {
-
-        new GLTFLoader().load(path, function (gltf) {
-            var model = gltf.scene;
-            onLoadCallback(model)
-
-
-        });
-    }
-
-    function loadGLTFAsync(path) {
-        return new Promise((resolve, reject) => {
-            loader.load(path, data => resolve(data), null, reject)
+        init().catch(e => {
+            console.log(e);
         })
-    }
 
-    function traverse(data) {
-        data.scene.traverse(function (child) {
-            if (child.isMesh) {
-                child.material.envMap = envtexture;
-                child.material.envMapIntensity = 5;
+        async function init() {
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 5.8, 12);
+            camera.position.z = 10;
+
+            loadSounds();
+
+            $("#vidaActual").text("Vidas: " + vidaInicial)
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            $("#sceneSection").append(renderer.domElement);
+
+            clock = new THREE.Clock();
+
+            scene = new THREE.Scene();
+
+            const ambientL = new THREE.AmbientLight(0x404040); // soft white light
+            scene.add(ambientL);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            scene.add(directionalLight);
+
+            directionalLight.position.z = 10;
+
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 3);
+            scene.add(directionalLight2);
+
+            directionalLight2.position.z = -20;
+            directionalLight2.position.y = 0;
+
+            lightprobe = new THREE.LightProbe();
+            scene.add(lightprobe)
+
+
+            loader = new GLTFLoader();
+
+            $("#gameOver").text("Cargando...")
+
+            if (levelSelected == "Estadio") {
+                var urls = genCubeUrls('./CubeMaps/Estadio/', '.png');
+                createCubeTexture(urls)
+
+                var soccer = await loadGLTFAsync("./models/Estadio/Soccer/SoccerA.glb")
+                traverse(soccer);
+                var basketball = await loadGLTFAsync("./models/Estadio/Basketball/BasketballA.glb")
+                traverse(basketball);
+                var baseball = await loadGLTFAsync("./models/Estadio/Baseball/BaseballA.glb")
+                traverse(baseball);
+                var boliche = await loadGLTFAsync("./models/Estadio/Boliche/Boliche.glb")
+                traverse(boliche);
             }
-        })
-        loadObj.push(data);
-    }
+            if (levelSelected == "Isla") {
+                var urls = genCubeUrls('./CubeMaps/Isla/', '.png');
+                createCubeTexture(urls)
 
+                var manzana = await loadGLTFAsync("./models/Isla/Manzana/ManzanaA.glb")
+                traverse(manzana);
+                var naranja = await loadGLTFAsync("./models/Isla/Naranja/OrangeA.glb")
+                traverse(naranja);
+                var platano = await loadGLTFAsync("./models/Isla/Platano/PlatanoA.glb")
+                traverse(platano);
+                var roca = await loadGLTFAsync("./models/Rock.glb")
+                traverse(roca);
+            }
+            if (levelSelected == "Dulceria") {
+                var urls = genCubeUrls('./CubeMaps/Dulceria/', '.png');
+                createCubeTexture(urls)
 
-    function onWindowResize() {
+                var candy = await loadGLTFAsync("./models/Dulceria/Candy/CandyA.glb")
+                traverse(candy);
+                var chocolate = await loadGLTFAsync("./models/Dulceria/Chocolate/ChocolateA.glb")
+                traverse(chocolate);
+                var paleta = await loadGLTFAsync("./models/Dulceria/Paleta/PaletaA.glb")
+                traverse(paleta);
+                var roca = await loadGLTFAsync("./models/Rock.glb")
+                traverse(roca);
+            }
+            $("#gameOver").text("")
 
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
+            if (multijugador == 1) {
 
-        animate();
-
-    }
-
-    function onKeyDown(event) {
-        keys[String.fromCharCode(event.keyCode)] = true;
-    }
-    function onKeyUp(event) {
-        keys[String.fromCharCode(event.keyCode)] = false;
-
-        var code = event.keyCode;
-        if (code == 32) {//Space bar 
-            GenerateBalls();
-        }
-    }
-    function mouseClickOn() {
-        event.preventDefault();
-        mouseClick = true;
-    }
-
-    function mouseClickOff() {
-        event.preventDefault();
-        mouseClick = false;
-    }
-
-    function GenerateBalls() {
-        var numBall = Math.floor(Math.random() * 4);
-        var Smodel = loadObj[numBall].scene;
-
-        Smodel.scale.x = 2
-        Smodel.scale.y = 2
-        Smodel.scale.z = 2
-
-        var mesh = Smodel.clone();
-
-        let fileAnimations = loadObj[0].animations;
-        let anim = fileAnimations[0];
-
-        mesh.userData.mixer = new THREE.AnimationMixer(mesh);
-        var actionL = mesh.userData.mixer.clipAction(loadObj[numBall].animations[0]);
-        var actionR = mesh.userData.mixer.clipAction(loadObj[numBall].animations[1]);
-        actionL.play();
-        actionR.play();
-
-
-        mesh.userData.direction = (getRandomArbitrary(-1, 1) > 0) ? 1 : -1;
-        mesh.userData.VelocidadX = mesh.userData.direction * (7 + getRandomArbitrary(0, 7));
-        mesh.userData.initialX = getRandomArbitrary(0, 5);
-        mesh.userData.initialY = getRandomArbitrary(0, 10);
-        mesh.userData.initialG = 0;
-        mesh.userData.planar = getRandomArbitrary(0, 30);
-        mesh.position.x = mesh.userData.direction * (-15 + mesh.userData.initialX);
-        mesh.position.y = -8 - mesh.userData.initialY;
-        mesh.position.z += getRandomArbitrary(-2, 2);
-
-        collisionObj.push(mesh)
-        scene.add(mesh)
-    }
-
-    function UpdateBalls() {
-        collisionObj.map(data => {
-
-            let value = MapRange(data.position.x, -15, 15, -1, 1)
-
-            data.rotation.z += THREE.Math.degToRad(- deltaTime * data.userData.VelocidadX * 15);
-            data.position.x += deltaTime * data.userData.VelocidadX;
-
-
-            if (data.userData.VelocidadX == 0) {
-                data.userData.initialG += deltaTime * .9;
-                data.position.x += data.userData.direction * deltaTime * 10;
-                data.position.y += -Math.pow(data.userData.initialG, 2);
-                data.position.y -= deltaTime * 5;
-                data.userData.mixer.update(deltaTime);
             } else {
-                data.position.y = (Math.pow(data.position.x + data.userData.initialX, 2) / (-14 - data.userData.planar)) + 8 - data.userData.initialY;
+                animate();
+            }
+
+
+            window.addEventListener('resize', onWindowResize, false);
+            document.addEventListener('mousemove', onMouseMove, false);
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('mousedown', mouseClickOn);
+            document.addEventListener('mouseup', mouseClickOff);
+
+            intervalGB = setInterval(GenerateBalls, 500)
+        }
+
+        function animate() {
+            if ((vidaInicial > 0) && (!Pausa || multijugador == 1)) {
+                deltaTime = clock.getDelta();
+                UpdateBalls();
+                Collision();
+                requestAnimationFrame(animate);
+                renderer.render(scene, camera);
+            }
+            else if (vidaInicial <= 0) {
+                $("#gameOver").text("Perdiste")
+                $("#gameOverModal").modal('show')
+                clearInterval(intervalGB)
+            }
+        }
+
+        function onMouseMove(event) {
+
+            event.preventDefault();
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+        }
+
+        function Collision() {
+            if (mouseClick) {
+                raycaster.setFromCamera(mouse, camera);
+
+                const collision = raycaster.intersectObjects(collisionObj, true);
+
+                if (collision.length > 0) {
+
+                    let objetoUserData = collision[0].object.parent.parent.userData;
+
+                    if (objetoUserData.dontCut && objetoUserData.VelocidadX != 0) {
+                        puntuaje--;
+                        vidaInicial--;
+                        $("#vidaActual").text("Vida: " + vidaInicial);
+                        if (soundOnOff) {
+                            if (getRandomArbitrary(-1, 1) > 0) {
+                                s_Slash_3.play();
+                            }
+                            else {
+                                s_Slash_4.play();
+                            }
+                        }
+                    }
+
+                    if (objetoUserData.VelocidadX != 0 && !objetoUserData.dontCut) {
+                        puntuaje++;
+
+                        if (soundOnOff) {
+                            if (getRandomArbitrary(-1, 1) > 0) {
+                                s_Slash_1.play();
+                            }
+                            else {
+                                s_Slash_2.play();
+                            }
+                        }
+
+                    }
+
+                    $("#puntuacion").text("Puntuaje: " + puntuaje);
+                    objetoUserData.VelocidadX = 0;
+
+                    // mesh.setColorAt(instanceId, color.setHex(Math.random() * 0xffffff));
+                    // mesh.instanceColor.needsUpdate = true;
+
+                }
+            }
+        }
+
+        function GenerateBalls() {
+            if (!Pausa || multijugador == 1) {
+                var numBall = Math.floor(Math.random() * 4);
+                var Smodel = loadObj[numBall].scene;
+
+                Smodel.scale.x = 2
+                Smodel.scale.y = 2
+                Smodel.scale.z = 2
+
+                var mesh = Smodel.clone();
+
+
+                if (numBall != 3) {
+                    mesh.userData.mixer = new THREE.AnimationMixer(mesh);
+                    var actionL = mesh.userData.mixer.clipAction(loadObj[numBall].animations[0]);
+                    var actionR = mesh.userData.mixer.clipAction(loadObj[numBall].animations[1]);
+                    actionL.play();
+                    actionR.play();
+                }
+                mesh.userData.dontCut = (numBall == 3) ? true : false;
+                mesh.userData.direction = (getRandomArbitrary(-1, 1) > 0) ? 1 : -1;
+                mesh.userData.VelocidadX = mesh.userData.direction * (7 + getRandomArbitrary(0, 7));
+                mesh.userData.initialX = getRandomArbitrary(0, 5);
+                mesh.userData.initialY = getRandomArbitrary(0, 10);
+                mesh.userData.initialG = 0;
+                mesh.userData.planar = getRandomArbitrary(0, 30);
+                mesh.position.x = mesh.userData.direction * (-15 + mesh.userData.initialX);
+                mesh.position.y = -8 - mesh.userData.initialY;
+                mesh.position.z += getRandomArbitrary(-2, 2);
+
+                collisionObj.push(mesh)
+                scene.add(mesh)
+            }
+        }
+        function UpdateBalls() {
+            collisionObj.map((data, index) => {
+
+                let value = MapRange(data.position.x, -15, 15, -1, 1)
+
+                data.rotation.z += THREE.Math.degToRad(- deltaTime * data.userData.VelocidadX * 15);
+                data.position.x += deltaTime * data.userData.VelocidadX;
+
+                if (data.userData.VelocidadX == 0 && !(data.userData.dontCut)) { data.userData.mixer.update(deltaTime); }
+
+                if (data.userData.VelocidadX == 0) {
+                    data.userData.initialG += deltaTime * .9;
+                    data.position.x += data.userData.direction * deltaTime * 10;
+                    data.position.y += -Math.pow(data.userData.initialG, 2);
+                    data.position.y -= deltaTime * 5;
+
+                } else {
+                    data.position.y = (Math.pow(data.position.x + data.userData.initialX, 2) / (-14 - data.userData.planar)) + 8 - data.userData.initialY;
+                }
+
+
+
+                if (data.position.y < -20) {
+                    if (data.userData.dontCut) {
+
+                    } else if (data.userData.VelocidadX != 0) {
+                        vidaInicial--;
+                        $("#vidaActual").text("Vida: " + vidaInicial);
+                        puntuaje--;
+                        $("#puntuacion").text("Puntuaje: " + puntuaje);
+                    }
+                    scene.remove(data);
+                    collisionObj.splice(index, 1);
+                }
+            })
+        }
+        function loadGLTFAsync(path) {
+            return new Promise((resolve, reject) => {
+                loader.load(path, data => resolve(data), null, reject)
+            })
+        }
+        function traverse(data) {
+            data.scene.traverse(function (child) {
+                if (child.isMesh) {
+                    child.material.envMap = envtexture;
+                    child.material.envMapIntensity = 5;
+                }
+            })
+            loadObj.push(data);
+        }
+        function onWindowResize() {
+
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            animate();
+
+        }
+        function onKeyDown(event) {
+            keys[String.fromCharCode(event.keyCode)] = true;
+
+            if (event.keyCode == 80) {
+                if (Pausa) {
+                    $("#Pausa").modal("hide")
+                    Pausa = false;
+                    animate();
+                } else {
+                    $("#Pausa").modal("show")
+                    Pausa = true;
+                }
+
+            }
+        }
+        function onKeyUp(event) {
+            keys[String.fromCharCode(event.keyCode)] = false;
+
+            var code = event.keyCode;
+            if (code == 32) {//Space bar 
+                GenerateBalls();
+            }
+        }
+        function mouseClickOn() {
+            event.preventDefault();
+            mouseClick = true;
+        }
+        function mouseClickOff() {
+            event.preventDefault();
+            mouseClick = false;
+        }
+        function createCubeTexture(urlCube) {
+            new THREE.CubeTextureLoader().load(urlCube, function (cubeTexture) {
+
+                cubeTexture.encoding = THREE.sRGBEncoding;
+
+                scene.background = cubeTexture;
+
+                lightprobe.copy(LightProbeGenerator.fromCubeTexture(cubeTexture));
+
+                envtexture = cubeTexture;
+            });
+        }
+        function loadSounds() {
+
+            const listener = new THREE.AudioListener();
+            camera.add(listener);
+
+            s_Slash_1 = new THREE.Audio(listener);
+            s_Slash_2 = new THREE.Audio(listener);
+            s_Slash_3 = new THREE.Audio(listener);
+            s_Slash_4 = new THREE.Audio(listener);
+
+            const audioLoader_1 = new THREE.AudioLoader();
+            audioLoader_1.load('Sounds/Slash_1.ogg', function (buffer) {
+                s_Slash_1.setBuffer(buffer);
+                s_Slash_1.setLoop(false);
+                s_Slash_1.setVolume(0.5);
+            });
+            const audioLoader_2 = new THREE.AudioLoader();
+            audioLoader_2.load('Sounds/Slash_2.ogg', function (buffer) {
+                s_Slash_2.setBuffer(buffer);
+                s_Slash_2.setLoop(false);
+                s_Slash_2.setVolume(0.5);
+            });
+            const audioLoader_3 = new THREE.AudioLoader();
+            audioLoader_3.load('Sounds/Slash_3.ogg', function (buffer) {
+                s_Slash_3.setBuffer(buffer);
+                s_Slash_3.setLoop(false);
+                s_Slash_3.setVolume(0.5);
+            });
+            const audioLoader_4 = new THREE.AudioLoader();
+            audioLoader_4.load('Sounds/Slash_4.ogg', function (buffer) {
+                s_Slash_4.setBuffer(buffer);
+                s_Slash_4.setLoop(false);
+                s_Slash_4.setVolume(0.5);
+            });
+        }
+
+        $(document).on("click", "#Facebook", function () {
+            shareScore(puntuaje);
+        })
+        $(document).on("click", "#MenuBack", function () {
+            window.location.replace("./index.html");
+        })
+        $(document).on("click", "#HighScoresSubmit", async function () {
+            try{
+                await uploadHighScore(nickname,puntuaje);
+                alert("Se subio tu puntuaje")
+            }
+            catch
+            {
+                alert("Hubo un error al subir tu puntuaje")
             }
         })
-    }
-
-    function createCubeTexture(urlCube) {
-        new THREE.CubeTextureLoader().load(urlCube, function (cubeTexture) {
-
-            cubeTexture.encoding = THREE.sRGBEncoding;
-
-            scene.background = cubeTexture;
-
-            lightprobe.copy(LightProbeGenerator.fromCubeTexture(cubeTexture));
-
-            envtexture = cubeTexture;
-        });
-    }
-
-</script>
+    </script>
+</head>
 
 <body>
+    <div id="sceneSection" style="position: absolute;">
 
+        <p id="puntuacion">Puntuacion: 0</p>
+        <p id="puntuacionE"></p>
+        <h1 id="gameOver"></h1>
+        <p id="vidaActual"></p>
+        <p id="vidaActualE"></p>
+    </div>
+
+
+    <script>
+        function initText() {
+            if (multijugador == 1) {
+                $("#puntuacionE").text("Puntuacion: 0");
+                $("#vidaActualE").text("Vida Enemigo: 0");
+            } else {
+
+            }
+        }
+    </script>
+
+    <script src="./js/firestore.js"></script>
     <style>
         html,
         body {
@@ -264,13 +457,107 @@
             overflow: hidden;
         }
 
-        canvas {
+        canvas,
+        #sceneSection {
             width: 100%;
             height: 100%;
             display: block;
         }
+
+        #puntuacion,
+        #puntuacionE,
+        #vidaActual,
+        #vidaActualE {
+            position: absolute;
+            color: rgb(255, 255, 255);
+            -webkit-text-stroke: 1.5px black;
+
+            font-size: 50px;
+            font-weight: bolder;
+            z-index: 100;
+            display: block;
+            width: 100%;
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+            display: block;
+            color: rgb(255, 255, 255);
+            -webkit-text-stroke: 1.5px black;
+            font-size: 100px;
+            font-weight: bolder;
+        }
+
+        #puntuacionE {
+            right: -120vh;
+            text-align: left;
+            top: -20px;
+        }
+
+        #puntuacion {
+            right: 120vh;
+            text-align: right;
+            top: -20px;
+        }
+
+        #vidaActual {
+            position: absolute;
+            bottom: -20px;
+            right: 120vh;
+            width: 100%;
+            text-align: right;
+        }
+
+        #vidaActualE {
+            bottom: -20px;
+            font-size: 50px;
+            right: -120vh;
+            width: 100%;
+            text-align: left;
+            z-index: 100;
+            display: block;
+        }
     </style>
 
+    <div class="modal fade" data-backdrop="static" data-keyboard="false" id="Pausa" tabindex="-1" role="dialog"
+        aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered px-auto" role="document">
+            <div id="PausaDialog" class="modal-content m-0 p-0">
+                <div class="gradient modal-body p-0 rounded">
+                    <h1 style="background-color: rgba(159, 189, 255, 0.315); font-size: 50px;"
+                        class="text-center p-3 rounded">PAUSA</h1>
+                    <span class="tog">
+                        <img src="./img/Menu/Sound.png" draggable="false" class="sButton h-100 w-100">
+                        <img src="./img/Menu/Mute.png" draggable="false" class="sButton h-100 w-100"
+                            style="display:none;">
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" data-backdrop="static" data-keyboard="false" id="gameOverModal" tabindex="-1" role="dialog"
+        aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered px-auto" role="document">
+            <div id="PausaDialog" class="modal-content m-0 p-0">
+                <div class="modal-header">
+                    <h1>Game Over</h1>
+                </div>
+                <div class="modal-body p-0 rounded">
+                    <h1>¿Qué quieres hacer?</h1>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="HighScoresSubmit">Subir puntuaje a highScores</button>
+                    <button class="btn btn-primary" id="MenuBack">Regresar al Menu</button>
+                    <button class="btn btn-primary" id="Facebook">Compartir en facebook tu puntuación</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
