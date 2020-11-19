@@ -16,8 +16,29 @@
     <script src="./node_modules/@popperjs/core/lib/"></script>
     <script src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
 
+    <script src="https://www.gstatic.com/firebasejs/8.0.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.0.2/firebase-firestore.js"></script>
+
     <script>
+        var multijugador = 0;
+        var actualUsername;
+        var ActualLevel;
+        var Player;
+        var sound = localStorage.getItem('sound') || "off";
+
         $(document).ready(function () {
+
+            actualUsername = localStorage.getItem('username');
+
+            if (sound == "off") {
+                $("#SoundOn").hide();
+                $("#SoundOff").show();
+            } else {
+                $("#SoundOff").hide();
+                $("#SoundOn").show();
+            }
+
+            $("#nickNameText").val(actualUsername);
 
             $("#BConfiguracion").click(function () {
                 $("#ConfiguracionModal").modal('toggle');
@@ -25,12 +46,67 @@
 
             $(".tog").click(function () {
                 $(this).find('img').toggle();
+                if (sound == "off") {
+                    sound = "on";
+                    localStorage.setItem('sound', "on");
+                }
+                else {
+                    sound = "off";
+                    localStorage.setItem('sound', "off");
+                }
             })
 
             $("#BUnJugador").click(function () {
-                $("#Inicio").slideToggle('10', "swing");
-                $("#LevelSelector").slideToggle('10', "swing");
+                Player = 1;
+                multijugador = 0;
+                $("#Inicio").slideUp();
+                $("#LevelSelector").slideDown();
                 $("#footer").fadeIn();
+            });
+
+            checkWhiteSpaces = new RegExp(/\s/)
+
+            $("#BMultijugador").click(function () {
+                if (actualUsername && !checkWhiteSpaces.test(actualUsername)) {
+                    multijugador = 1;
+                    $("#Inicio").slideUp();
+                    $("#Multijugador").slideDown();
+                    $("#footer").fadeIn();
+                } else {
+                    alert("Para entrar a multijugador tienes que tener un nickname, ve al apartado de cambiar nickname RECUERDA NO USAR ESPACIOS EN BLANCO")
+                }
+            });
+
+            $(document).on("click", '.multiSelector', async function () {
+                let id = $(this).closest('tr').attr('id');
+                joinSala(id, actualUsername);
+                try {
+                    ActualLevel = await getNivel(id);
+                    Player=2;
+                    redirectGame(id);
+
+                }
+                catch (e) {
+                    console.log(e)
+                }
+            })
+
+            $("#L_Isla").click(function () {
+                ActualLevel = "Isla";
+                multiUnJugador();
+            })
+            $("#L_Estadio").click(function () {
+                ActualLevel = "Estadio";
+                multiUnJugador();
+            })
+            $("#L_Dulceria").click(function () {
+                ActualLevel = "Dulceria";
+                multiUnJugador();
+            })
+
+            $("#crearSala").click(function () {
+                $("#LevelSelector").slideDown();
+                $("#Multijugador").slideUp();
             });
 
             $("#BHighScore").click(function () {
@@ -40,19 +116,14 @@
             });
 
             $(".cross").click(function () {
+                Player = null;
+                multijugador = 0;
+                ActualLevel = "";
                 $("#LevelSelector").slideUp();
                 $("#Inicio").slideDown();
                 $("#HighScores").slideUp();
+                $("#Multijugador").slideUp();
                 $("#footer").fadeOut();
-            });
-
-            $(document).on('keyup', function (evt) {
-                if (evt.keyCode == 27) {
-                    $("#LevelSelector").slideUp();
-                    $("#Inicio").slideDown();
-                    $("#HighScores").slideUp();
-                    $("#ConfiguracionModal").modal('hide');
-                }
             });
 
             $(document).on('keyup', function (evt) {
@@ -61,6 +132,33 @@
                 }
             });
 
+            $("#acceptNickname").click(function () {
+                let nicknameValue = $("#nickNameText").val();
+                actualUsername = nicknameValue;
+                localStorage.setItem('username', nicknameValue);
+                $("#nicknameModal").modal("hide")
+            })
+
+            async function multiUnJugador() {
+                if (multijugador == 1) {
+                    Player=1;
+                    var id = await createSala(ActualLevel);
+                    redirectGame(id);
+                } else {
+                    redirectGame(0);
+                }
+            }
+
+            function redirectGame(idSalaJuego) {
+                let nick = "nickname=" + actualUsername || "nickname=Guest";
+                let mult = "&multijugador=" + multijugador || "&multijugador=0";
+                let lev = "&levelSelected=" + ActualLevel || "&levelSelected=Estadio";
+                let play = "&Player=" + Player || "&Player=1";
+                let idSala = ("&SalaID=" + idSalaJuego) || "&SalaID=0";
+                let soundOnOff = "&sound=" + sound || "&sound='false'";
+                window.location.replace("./game.html?" + nick + mult + lev + play + idSala + soundOnOff);
+            }
+
         })
 
     </script>
@@ -68,7 +166,8 @@
 </head>
 
 <body class="p-0 m-0 ">
-    <div id="Inicio" style="height: 100vh;" class="row m-0 p-0">
+
+    <div id="Inicio" style="height: 100vh;" class="row m-0 p-0 position-relative">
         <div class="col-6 h-100">
             <div class="row h-25">
                 <div class="col-12 align-self-center text-center">
@@ -97,6 +196,29 @@
                 <img id="logo" src="./img/Menu/SlashIt.svg" draggable="false" class="w-100" alt="">
             </div>
         </div>
+        <div class='bottom-right'>
+            <button type='button' data-toggle="modal" data-target="#nicknameModal"
+                class='LogRegLog btn btn-primary btn-large btn-start'>Cambiar nickname</button>
+        </div>
+    </div>
+
+    <div id="Multijugador" style="height: 100vh; display: none;" class="m-0 p-0">
+        <button id="crearSala" class="btn-block btn-lg btn btn-primary">CREAR SALA</button>
+        <p style="font-size: 100px; background-color: rgba(115, 115, 255, 0.678);" class="text-center">Salas
+        </p>
+        <table id="salasTable" class="mx-auto table table-dark w-50 m-0 p-0">
+            <thead>
+                <tr>
+                    <th>SalaID</th>
+                    <th>Creador de la sala</th>
+                    <th>Nivel</th>
+                    <th>Unirse</th>
+                </tr>
+            </thead>
+            <tbody>
+
+            </tbody>
+        </table>
     </div>
 
     <div id="LevelSelector" style="background-color: black; height: 100vh; display: none;" class="row m-0 p-0">
@@ -110,57 +232,21 @@
         <div class="m-0 p-0">
             <p style="font-size: 100px; background-color: rgba(115, 115, 255, 0.678);" class="text-center">HIGH-SCORES
             </p>
-            <table class="mx-auto table table-dark h-100 w-50 m-0 p-0">
-                <tr>
-                    <th>Nombre</th>
-                    <th>Puntuaje</th>
-                    <th>Fecha</th>
-                </tr>
-                <tr>
-                    <td>EDG</td>
-                    <td>100</td>
-                    <td>2020/12/03</td>
-                </tr>
-                <tr>
-                    <td>EDG</td>
-                    <td>100</td>
-                    <td>2020/12/03</td>
-                </tr>
-                <tr>
-                    <td>EDG</td>
-                    <td>100</td>
-                    <td>2020/12/03</td>
-                </tr>
-                <tr>
-                    <td>EDG</td>
-                    <td>100</td>
-                    <td>2020/12/03</td>
-                </tr>
-                <tr>
-                    <td>EDG</td>
-                    <td>100</td>
-                    <td>2020/12/03</td>
-                </tr>
-                <tr>
-                    <td>EDG</td>
-                    <td>100</td>
-                    <td>2020/12/03</td>
-                </tr>
-                <tr>
-                    <td>EDG</td>
-                    <td>100</td>
-                    <td>2020/12/03</td>
-                </tr>
-                <tr>
-                    <td>EDG</td>
-                    <td>100</td>
-                    <td>2020/12/03</td>
-                </tr>
-                <tr>
-                    <td>EDG</td>
-                    <td>100</td>
-                    <td>2020/12/03</td>
-                </tr>
+            <table id="highScoresTable" class="mx-auto table table-dark h-100 w-50 m-0 p-0">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Puntuaje</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>EDG</td>
+                        <td>100</td>
+                        <td>2020/12/03</td>
+                    </tr>
+                </tbody>
             </table>
         </div>
     </div>
@@ -175,15 +261,39 @@
             <div id="ConfiguracionDialog" class="modal-content">
                 <div class="modal-body">
                     <span class="tog">
-                        <img src="./img/Menu/Sound.png" draggable="false" class="sButton h-100 w-100">
-                        <img src="./img/Menu/Mute.png" draggable="false" class="sButton h-100 w-100" style="display:none;">
+                        <img id="SoundOn" src="./img/Menu/Sound.png" draggable="false" class="sButton h-100 w-100">
+                        <img id="SoundOff" src="./img/Menu/Mute.png" draggable="false" class="sButton h-100 w-100"
+                            style="display:none;">
                     </span>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="modal fade"  id="Pausa" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle"
+    <div class="modal fade" id="nicknameModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLongTitle">Cambiar nickname</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="nickName">Nickname</label>
+                        <input type="text" class="form-control" id="nickNameText" placeholder="nickname">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                    <button id="acceptNickname" type="button" class="btn btn-primary">Guardar Nickname</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="Pausa" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle"
         aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered px-auto" role="document">
             <div id="PausaDialog" class="modal-content m-0 p-0">
@@ -192,13 +302,27 @@
                         class="text-center p-3 rounded">PAUSA</h1>
                     <span class="tog">
                         <img src="./img/Menu/Sound.png" draggable="false" class="sButton h-100 w-100">
-                        <img src="./img/Menu/Mute.png" draggable="false" class="sButton h-100 w-100" style="display:none;">
+                        <img src="./img/Menu/Mute.png" draggable="false" class="sButton h-100 w-100"
+                            style="display:none;">
                     </span>
                 </div>
             </div>
         </div>
     </div>
 
+    <script src="./js/firestore.js"></script>
+
+    <style>
+        .bottom-right {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+        }
+
+        .LogRegLog {
+            font-size: 36px;
+        }
+    </style>
 
 </body>
 
