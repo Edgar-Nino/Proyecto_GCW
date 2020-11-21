@@ -22,7 +22,9 @@ firestore.collection("highScores").orderBy("puntuaje", "desc").limit(5)
             content += '<tr>';
             content += '<td>' + val.nombre + '</td>';
             content += '<td>' + val.puntuaje + '</td>';
-            content += '<td>' + val.fecha.toDate() + '</td>';
+            let fecha = val.fecha.toDate().toString();
+            fecha = fecha.substring(0, fecha.length - 32);
+            content += '<td>' + fecha + '</td>';
 
             content += '</tr>';
         });
@@ -46,9 +48,10 @@ firestore.collection("sala").where("numUsuarios", "<", 2).limit(10)
         });
         $('#salasTable').append(content);
     });
+    
 function joinSala(id, actualUsername) {
     firestore.collection("sala").doc(id).update({
-        Player2: { username: actualUsername, ready: true },
+        Player2: { username: actualUsername, ready: false },
         numUsuarios: 2,
     })
         .then(function () {
@@ -76,27 +79,13 @@ function getNivel(id) {
     })
 }
 
-function createSala(aLevel) {
+function createSala(aLevel, actualUsername) {
     return new Promise((resolve, reject) => {
         var docRef = firestore.collection("sala").add({
-            Player1: { ready: true, username: actualUsername },
+            Player1: { ready: false, 
+                username: actualUsername ,},
             numUsuarios: 1,
-            Nivel: aLevel
-        })
-            .then(function (refDoc) {
-                resolve(refDoc.id)
-            }).catch(function (error) {
-                reject("Error getting document:", error)
-            })
-    })
-}
-
-function uploadHighScore(nickname, puntuacion) {
-    return new Promise((resolve, reject) => {
-        var docRef = firestore.collection("highScores").add({
-            fecha: firebase.firestore.Timestamp.now(),
-            nombre: nickname,
-            puntuaje: puntuacion
+            Nivel: aLevel,
         })
             .then(function (refDoc) {
                 resolve(refDoc.id)
