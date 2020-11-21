@@ -41,26 +41,37 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2(1, 1);
 
+        const mouseAux = new THREE.Vector2(1, 1);
+
         var collisionObj = [];
+        var collPowerUpObj = [];
         var loadObj = [];
         var keys = {};
 
         var intervalGB;
+        var intervalGPU;
 
-        var nickname = getUrlParameter("nickname");
-        var levelSelected = getUrlParameter("levelSelected");
-        var multijugador = getUrlParameter("multijugador");
-        var player = getUrlParameter("Player");
-        var idSala = getUrlParameter("SalaID");
-        var soundOnOff = (getUrlParameter("sound")=="on")?true:false;
+        var nickname = getUrlParameter("nickname") || "Guest";
+        var levelSelected = getUrlParameter("levelSelected") || "Estadio";
+        var multijugador = getUrlParameter("multijugador") || 0;
+        var player = getUrlParameter("Player") || 1;
+        var idSala = getUrlParameter("SalaID") || 0;
+        var soundOnOff = (getUrlParameter("sound") == "off") ? false : true;
 
         var vidaInicial = 4;
         let secondsPass = 0;
+
+        var secondsPowerUp = 0;
+        var VelocidadGlobal = 1;
 
         var s_Slash_1;
         var s_Slash_2;
         var s_Slash_3;
         var s_Slash_4;
+        var s_Slash_5;
+        var s_Slash_6;
+        var s_Slash_7;
+        var s_Slash_8;
 
         init().catch(e => {
             console.log(e);
@@ -105,6 +116,7 @@
 
             $("#gameOver").text("Cargando...")
 
+
             if (levelSelected == "Estadio") {
                 var urls = genCubeUrls('./CubeMaps/Estadio/', '.png');
                 createCubeTexture(urls)
@@ -144,10 +156,19 @@
                 var roca = await loadGLTFAsync("./models/Rock.glb")
                 traverse(roca);
             }
+            var reloj = await loadGLTFAsync("./models/Reloj.glb")
+            traverse(reloj);
+            var rayo = await loadGLTFAsync("./models/Rayo.glb")
+            traverse(rayo);
+
             $("#gameOver").text("")
 
-            if (multijugador == 1) {
-
+            if (multijugador == 1 && idSala != 0) {
+                readyPlayer(idSala, player, nickname);
+                $("#gameOver").text("Esperando Jugador...")
+                let playerReady = await checkReady(idSala)
+                $("#gameOver").text("")
+                animate();
             } else {
                 animate();
             }
@@ -160,16 +181,39 @@
             document.addEventListener('mousedown', mouseClickOn);
             document.addEventListener('mouseup', mouseClickOff);
 
-            intervalGB = setInterval(GenerateBalls, 500)
+            intervalGB = setInterval(GenerateBalls, 500);
+            intervalGPU = setInterval(GeneratePowerUps, 5000);
+
+            if (multijugador == 1) {
+                firestore.collection("sala").doc(idSala)
+                    .onSnapshot(function (querySnapshot) {
+
+
+                        if (player == 1) {
+                            $("#puntuacionE").text("Puntuacion Enemigo: " + querySnapshot.data().P2puntuacion)
+                            $("#vidaActualE").text("Vida Enemigo: " + querySnapshot.data().P2vida)
+                        } else if (player == 2) {
+                            $("#puntuacionE").text("Puntuacion Enemigo: " + querySnapshot.data().P1puntuacion)
+                            $("#vidaActualE").text("Vida Enemigo: " + querySnapshot.data().P1vida)
+                        }
+                    });
+            }
         }
 
         function animate() {
             if ((vidaInicial > 0) && (!Pausa || multijugador == 1)) {
                 deltaTime = clock.getDelta();
                 UpdateBalls();
+                UpdatePowerups();
                 Collision();
+                CollisionPowerUp();
                 requestAnimationFrame(animate);
                 renderer.render(scene, camera);
+                secondsPowerUp -= deltaTime;
+                if (secondsPowerUp < 0) {
+                    VelocidadGlobal = 1;
+                    secondsPowerUp = 0;
+                }
             }
             else if (vidaInicial <= 0) {
                 $("#gameOver").text("Perdiste")
@@ -184,7 +228,8 @@
 
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-
+            mouseAux.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouseAux.y = - (event.clientY / window.innerHeight) * 2 + 1;
         }
 
         function Collision() {
@@ -201,6 +246,10 @@
                         puntuaje--;
                         vidaInicial--;
                         $("#vidaActual").text("Vida: " + vidaInicial);
+                        if (multijugador == 1) {
+                            sendLife(idSala, player, vidaInicial);
+                            sendPuntuacion(idsala, player, puntuaje);
+                        }
                         if (soundOnOff) {
                             if (getRandomArbitrary(-1, 1) > 0) {
                                 s_Slash_3.play();
@@ -213,6 +262,9 @@
 
                     if (objetoUserData.VelocidadX != 0 && !objetoUserData.dontCut) {
                         puntuaje++;
+                        if (multijugador == 1) {
+                            sendPuntuacion(idSala, player, puntuaje);
+                        }
 
                         if (soundOnOff) {
                             if (getRandomArbitrary(-1, 1) > 0) {
@@ -235,9 +287,69 @@
             }
         }
 
+        function CollisionPowerUp() {
+            if (mouseClick) {
+                raycaster.setFromCamera(mouse, camera);
+
+                const collision = raycaster.intersectObjects(collPowerUpObj, true);
+
+                if (collision.length > 0) {
+
+                    let objetoUserData = collision[0].object.parent.parent.userData;
+
+                    if (objetoUserData.isRayo) {
+                        VelocidadGlobal = 2;
+                        if (soundOnOff) {
+                            if (getRandomArbitrary(-1, 1) > 0) {
+                                s_Slash_5.play();
+                            }
+                            else {
+                                s_Slash_6.play();
+                            }
+                        }
+
+                    } else {
+                        VelocidadGlobal = .5;
+                        if (soundOnOff) {
+                            if (getRandomArbitrary(-1, 1) > 0) {
+                                s_Slash_7.play();
+                            }
+                            else {
+                                s_Slash_8.play();
+                            }
+                        }
+                    }
+                    secondsPowerUp = 5;
+                    objetoUserData.notDeleted = false;
+                }
+            }
+        }
+
+        function GeneratePowerUps() {
+            if ((!Pausa || multijugador == 1) && !(secondsPowerUp > 0) && (collPowerUpObj.length == 0)) {
+                var numPowerUp = getRandomInt(4, 6);
+                var Pmodel = loadObj[numPowerUp].scene;
+
+                Pmodel.scale.x = 2
+                Pmodel.scale.y = 2
+                Pmodel.scale.z = 2
+
+                var mesh = Pmodel.clone();
+
+
+                mesh.userData.isRayo = (numPowerUp == 5) ? true : false
+                mesh.userData.Velocidad = 10;
+                mesh.position.x = getRandomArbitrary(-14, 14);
+                mesh.position.y = getRandomArbitrary(-7, 7);
+                mesh.position.z += getRandomArbitrary(-2, 2);
+                mesh.userData.notDeleted = true;
+                collPowerUpObj.push(mesh)
+                scene.add(mesh)
+            }
+        }
         function GenerateBalls() {
             if (!Pausa || multijugador == 1) {
-                var numBall = Math.floor(Math.random() * 4);
+                var numBall = getRandomInt(0, 4);
                 var Smodel = loadObj[numBall].scene;
 
                 Smodel.scale.x = 2
@@ -269,13 +381,14 @@
                 scene.add(mesh)
             }
         }
+
         function UpdateBalls() {
             collisionObj.map((data, index) => {
 
                 let value = MapRange(data.position.x, -15, 15, -1, 1)
 
                 data.rotation.z += THREE.Math.degToRad(- deltaTime * data.userData.VelocidadX * 15);
-                data.position.x += deltaTime * data.userData.VelocidadX;
+                data.position.x += deltaTime * data.userData.VelocidadX * VelocidadGlobal;
 
                 if (data.userData.VelocidadX == 0 && !(data.userData.dontCut)) { data.userData.mixer.update(deltaTime); }
 
@@ -299,9 +412,51 @@
                         $("#vidaActual").text("Vida: " + vidaInicial);
                         puntuaje--;
                         $("#puntuacion").text("Puntuaje: " + puntuaje);
+                        if (multijugador == 1) {
+                            sendPuntuacion(idSala, player, puntuaje);
+                            sendLife(idSala, player, vidaInicial)
+                        }
                     }
                     scene.remove(data);
                     collisionObj.splice(index, 1);
+                }
+            })
+        }
+
+        function UpdatePowerups() {
+            collPowerUpObj.map((data, index) => {
+                var x = mouse.x * 13;
+                var y = mouse.y * 8;
+
+                var vec3 = new THREE.Vector3(data.position.x, data.position.y, data.position.z)
+                var vec3Mouse = new THREE.Vector3(x, y, data.position.z)
+
+                if (data.userData.isRayo) {
+                    vec3Mouse.sub(vec3);
+                    vec3Mouse.normalize();
+                    vec3Mouse.multiplyScalar(6 * deltaTime);
+                    data.position.add(vec3Mouse)
+                } else {
+                    vec3.sub(vec3Mouse);
+                    vec3.normalize();
+                    vec3.multiplyScalar(6 * deltaTime);
+                    data.position.add(vec3)
+                }
+
+                if (data.position.x > 12)
+                    data.position.x = 12;
+                if (data.position.y > 7)
+                    data.position.y = 7;
+                if (data.position.x < -12)
+                    data.position.x = -12;
+                if (data.position.y < -7)
+                    data.position.y = -7;
+
+                data.rotation.y += THREE.Math.degToRad(deltaTime * 90);
+
+                if (!data.userData.notDeleted) {
+                    scene.remove(data);
+                    collPowerUpObj.splice(index, 1);
                 }
             })
         }
@@ -380,31 +535,36 @@
             s_Slash_2 = new THREE.Audio(listener);
             s_Slash_3 = new THREE.Audio(listener);
             s_Slash_4 = new THREE.Audio(listener);
+            s_Slash_5 = new THREE.Audio(listener);
+            s_Slash_6 = new THREE.Audio(listener);
+            s_Slash_7 = new THREE.Audio(listener);
+            s_Slash_8 = new THREE.Audio(listener);
 
-            const audioLoader_1 = new THREE.AudioLoader();
-            audioLoader_1.load('Sounds/Slash_1.ogg', function (buffer) {
-                s_Slash_1.setBuffer(buffer);
-                s_Slash_1.setLoop(false);
-                s_Slash_1.setVolume(0.5);
+            audioLoader('Sounds/Slash_1.ogg', s_Slash_1)
+            audioLoader('Sounds/Slash_2.ogg', s_Slash_2)
+            audioLoader('Sounds/Slash_3.ogg', s_Slash_3)
+            audioLoader('Sounds/Slash_4.ogg', s_Slash_4)
+            audioLoader('Sounds/Slash_5.ogg', s_Slash_5)
+            audioLoader('Sounds/Slash_6.ogg', s_Slash_6)
+            audioLoader('Sounds/Slash_7.ogg', s_Slash_7)
+            audioLoader('Sounds/Slash_8.ogg', s_Slash_8)
+        }
+
+        function audioLoader(sound, object) {
+            const audioLoader = new THREE.AudioLoader();
+            audioLoader.load(sound, function (buffer) {
+                object.setBuffer(buffer);
+                object.setLoop(false);
+                object.setVolume(0.5);
             });
-            const audioLoader_2 = new THREE.AudioLoader();
-            audioLoader_2.load('Sounds/Slash_2.ogg', function (buffer) {
-                s_Slash_2.setBuffer(buffer);
-                s_Slash_2.setLoop(false);
-                s_Slash_2.setVolume(0.5);
-            });
-            const audioLoader_3 = new THREE.AudioLoader();
-            audioLoader_3.load('Sounds/Slash_3.ogg', function (buffer) {
-                s_Slash_3.setBuffer(buffer);
-                s_Slash_3.setLoop(false);
-                s_Slash_3.setVolume(0.5);
-            });
-            const audioLoader_4 = new THREE.AudioLoader();
-            audioLoader_4.load('Sounds/Slash_4.ogg', function (buffer) {
-                s_Slash_4.setBuffer(buffer);
-                s_Slash_4.setLoop(false);
-                s_Slash_4.setVolume(0.5);
-            });
+        }
+
+        if (soundOnOff == false) {
+            $("#SoundOn").hide();
+            $("#SoundOff").show();
+        } else {
+            $("#SoundOff").hide();
+            $("#SoundOn").show();
         }
 
         $(document).on("click", "#Facebook", function () {
@@ -414,15 +574,26 @@
             window.location.replace("./index.html");
         })
         $(document).on("click", "#HighScoresSubmit", async function () {
-            try{
-                await uploadHighScore(nickname,puntuaje);
+            try {
+                await uploadHighScore(nickname, puntuaje);
                 alert("Se subio tu puntuaje")
+                $("#HighScoresSubmit").prop('disabled', true);
             }
             catch
             {
                 alert("Hubo un error al subir tu puntuaje")
             }
         })
+        $(".tog").click(function () {
+            $(this).find('img').toggle();
+            if (soundOnOff == true) {
+                soundOnOff = false;
+            }
+            else {
+                soundOnOff = true;
+            }
+        })
+
     </script>
 </head>
 
@@ -442,13 +613,14 @@
             if (multijugador == 1) {
                 $("#puntuacionE").text("Puntuacion: 0");
                 $("#vidaActualE").text("Vida Enemigo: 0");
+
             } else {
 
             }
         }
     </script>
 
-    <script src="./js/firestore.js"></script>
+    <script src="./js/firestore_game.js"></script>
     <style>
         html,
         body {
@@ -531,8 +703,8 @@
                     <h1 style="background-color: rgba(159, 189, 255, 0.315); font-size: 50px;"
                         class="text-center p-3 rounded">PAUSA</h1>
                     <span class="tog">
-                        <img src="./img/Menu/Sound.png" draggable="false" class="sButton h-100 w-100">
-                        <img src="./img/Menu/Mute.png" draggable="false" class="sButton h-100 w-100"
+                        <img id="SoundOn" src="./img/Menu/Sound.png" draggable="false" class="sButton h-100 w-100">
+                        <img id="SoundOff" src="./img/Menu/Mute.png" draggable="false" class="sButton h-100 w-100"
                             style="display:none;">
                     </span>
                 </div>
