@@ -142,7 +142,7 @@
             async function multiUnJugador() {
                 if (multijugador == 1) {
                     Player=1;
-                    var id = await createSala(ActualLevel);
+                    var id = await createSala(ActualLevel, actualUsername);
                     redirectGame(id);
                 } else {
                     redirectGame(0);
@@ -241,11 +241,6 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td>EDG</td>
-                        <td>100</td>
-                        <td>2020/12/03</td>
-                    </tr>
                 </tbody>
             </table>
         </div>
