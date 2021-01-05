@@ -13,7 +13,7 @@ firebase.initializeApp(firebaseConfig);
 
 var firestore = firebase.firestore();
 
-firestore.collection("highScores").orderBy("puntuaje", "desc").limit(5)
+firestore.collection("highScores").orderBy("puntuaje", "desc").limit(10)
     .onSnapshot(function (querySnapshot) {
         var content = '';
         $("#highScoresTable tbody").empty();

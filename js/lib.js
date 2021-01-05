@@ -18,7 +18,7 @@ function genCubeUrls(prefix, postfix) {
 
 function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min)) + min;
-  }
+}
 
 function getUrlParameter(sParam) {
     var sPageURL = window.location.search.substring(1),
@@ -35,28 +35,28 @@ function getUrlParameter(sParam) {
     }
 };
 
-window.fbAsyncInit = function() {
+window.fbAsyncInit = function () {
     FB.init({
-      appId      : '690454121678710',
-      xfbml      : true,
-      version    : 'v9.0'
+        appId: '690454121678710',
+        xfbml: true,
+        version: 'v9.0'
     });
     FB.AppEvents.logPageView();
-  };
+};
 
-  (function(d, s, id){
-     var js, fjs = d.getElementsByTagName(s)[0];
-     if (d.getElementById(id)) {return;}
-     js = d.createElement(s); js.id = id;
-     js.src = "https://connect.facebook.net/en_US/sdk.js";
-     fjs.parentNode.insertBefore(js, fjs);
-   }(document, 'script', 'facebook-jssdk'));
+(function (d, s, id) {
+    var js, fjs = d.getElementsByTagName(s)[0];
+    if (d.getElementById(id)) { return; }
+    js = d.createElement(s); js.id = id;
+    js.src = "https://connect.facebook.net/en_US/sdk.js";
+    fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));
 
 function shareScore(score) {
     FB.ui({
         method: 'share',
-        href: 'https://google.com',
-        hashtag: '#Hola',
+        href: 'https://slash-it-gcw.000webhostapp.com/',
+        hashtag: '#Slash-It',
         quote: "MI PUNTUACION FUE: " + score
     }, function (response) { });
 }

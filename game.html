@@ -9,13 +9,41 @@
 
     <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css">
 
-    <script src="./node_modules/jquery/dist/jquery.min.js"></script>
-    <script src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
+
 
     <script src="https://www.gstatic.com/firebasejs/8.0.2/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.0.2/firebase-firestore.js"></script>
 
+    <script type="text/javascript" src="js/libs/gl-matrix.js"></script>
+    <script type="text/javascript" src="js/libs/shader-utility.js"></script>
 
+    <script id="shader-vs" type="x-shader/x-vertex">
+		//GLSL
+
+		attribute vec3 aVertexPosition;
+		uniform mat4 uMVMatrix;
+		uniform mat4 uPMatrix;
+		varying vec4 v_color;
+
+		void main(void){
+			gl_Position= uPMatrix*uMVMatrix*vec4(aVertexPosition,1.0);
+			v_color = gl_Position*.1+0.9;
+		}
+
+	</script>
+
+    <script id="shader-fs" type="x-shader/x-fragment">
+		precision mediump float;
+		varying vec4 v_color;
+
+		void main(void){
+
+			gl_FragColor = v_color*.3;
+		}
+    </script>
+
+    <script src="./node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="./node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
     <script src="js/lib.js"></script>
     <script type="module">
         import * as THREE from './node_modules/three/build/three.module.js';
@@ -32,6 +60,7 @@
 
         var clock;
         var deltaTime;
+        var timerAcumulado = 0;
 
         var envtexture;
         var lightprobe;
@@ -45,8 +74,11 @@
 
         var collisionObj = [];
         var collPowerUpObj = [];
+        var particles = [];
         var loadObj = [];
         var keys = {};
+
+        var timerParticles = 0;
 
         var intervalGB;
         var intervalGPU;
@@ -73,22 +105,67 @@
         var s_Slash_7;
         var s_Slash_8;
 
+        var gl;
+        var shaderProgram;
+
+        var timer = 0;
         init().catch(e => {
             console.log(e);
         })
 
         async function init() {
 
+            try {
+
+                var canvas = $("#CanvasWaiting")[0];
+
+                gl = canvas.getContext("webgl");
+
+                gl.viewportWidth = canvas.width;
+                gl.viewportHeight = canvas.height;
+
+                gl.clearColor(0.0, 0.0, 0.0, 1.0);
+                gl.enable(gl.DEPHT_TEST);
+
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+
+            } catch (e) {
+                alert(e);
+                return true;
+            }
+
+            // PASO #2
+            // Compilar los shaders y asignarselos a webgl
+            var vertexShader = getShader(gl, $("#shader-vs")[0]);
+            var fragmentShader = getShader(gl, $("#shader-fs")[0]);
+
+            // Creamos el programa del shader
+            shaderProgram = gl.createProgram();
+
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+
+            // Validamos que no exista algun error
+            // al inicializar el Shader Program
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+                alert("Error con el ShaderProgram!");
+                return false;
+            }
+
+            gl.useProgram(shaderProgram);
+
+
+            var timerDraw = window.setInterval(draw, 8);
+
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 5.8, 12);
             camera.position.z = 10;
 
             loadSounds();
 
-            $("#vidaActual").text("Vidas: " + vidaInicial)
+
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            $("#sceneSection").append(renderer.domElement);
 
             clock = new THREE.Clock();
 
@@ -130,6 +207,8 @@
                 var boliche = await loadGLTFAsync("./models/Estadio/Boliche/Boliche.glb")
                 traverse(boliche);
             }
+
+
             if (levelSelected == "Isla") {
                 var urls = genCubeUrls('./CubeMaps/Isla/', '.png');
                 createCubeTexture(urls)
@@ -174,6 +253,16 @@
             }
 
 
+            var element = document.getElementById("CanvasWaiting");
+            element.parentNode.removeChild(element);
+            clearInterval(timerDraw);
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            $("#sceneSection").append(renderer.domElement);
+
+            $("#vidaActual").text("Vidas: " + vidaInicial)
+            $("#puntuacion").text("Puntuacion: 0")
+
             window.addEventListener('resize', onWindowResize, false);
             document.addEventListener('mousemove', onMouseMove, false);
             document.addEventListener('keydown', onKeyDown);
@@ -203,6 +292,8 @@
         function animate() {
             if ((vidaInicial > 0) && (!Pausa || multijugador == 1)) {
                 deltaTime = clock.getDelta();
+                GenerateParticles();
+                UpdateParticles();
                 UpdateBalls();
                 UpdatePowerups();
                 Collision();
@@ -210,6 +301,9 @@
                 requestAnimationFrame(animate);
                 renderer.render(scene, camera);
                 secondsPowerUp -= deltaTime;
+
+                timerAcumulado += deltaTime;
+
                 if (secondsPowerUp < 0) {
                     VelocidadGlobal = 1;
                     secondsPowerUp = 0;
@@ -248,7 +342,7 @@
                         $("#vidaActual").text("Vida: " + vidaInicial);
                         if (multijugador == 1) {
                             sendLife(idSala, player, vidaInicial);
-                            sendPuntuacion(idsala, player, puntuaje);
+                            sendPuntuacion(idSala, player, puntuaje);
                         }
                         if (soundOnOff) {
                             if (getRandomArbitrary(-1, 1) > 0) {
@@ -325,6 +419,32 @@
             }
         }
 
+        function GenerateParticles() {
+            if ((!Pausa || multijugador == 1)) {
+                if (timerParticles < 0) {
+                    var HueInitial = getRandomArbitrary(0, 1)
+                    const colorD = new THREE.Color("hsl(" + HueInitial * 255 + ", 100%, 50%)");
+                    const material = new THREE.MeshBasicMaterial({ color: colorD });
+                    const geometry = new THREE.IcosahedronGeometry();
+                    var mesh = new THREE.Mesh(geometry, material);
+
+                    mesh.userData.HueInitial = HueInitial
+                    mesh.userData.Velocidad = getRandomArbitrary(5, 12);
+                    mesh.position.x = getRandomArbitrary(-14, 14);
+                    mesh.userData.lifeTime = getRandomArbitrary(4, 8);
+                    mesh.position.y = -10;
+                    mesh.position.z = -2;
+
+
+
+                    particles.push(mesh)
+                    scene.add(mesh)
+                    timerParticles = .1;
+                }
+                timerParticles -= deltaTime;
+            }
+        }
+
         function GeneratePowerUps() {
             if ((!Pausa || multijugador == 1) && !(secondsPowerUp > 0) && (collPowerUpObj.length == 0)) {
                 var numPowerUp = getRandomInt(4, 6);
@@ -342,13 +462,16 @@
                 mesh.position.x = getRandomArbitrary(-14, 14);
                 mesh.position.y = getRandomArbitrary(-7, 7);
                 mesh.position.z += getRandomArbitrary(-2, 2);
+                mesh.userData.lifeTime = getRandomArbitrary(5, 8);
                 mesh.userData.notDeleted = true;
                 collPowerUpObj.push(mesh)
                 scene.add(mesh)
             }
         }
+
         function GenerateBalls() {
             if (!Pausa || multijugador == 1) {
+
                 var numBall = getRandomInt(0, 4);
                 var Smodel = loadObj[numBall].scene;
 
@@ -373,13 +496,59 @@
                 mesh.userData.initialY = getRandomArbitrary(0, 10);
                 mesh.userData.initialG = 0;
                 mesh.userData.planar = getRandomArbitrary(0, 30);
-                mesh.position.x = mesh.userData.direction * (-15 + mesh.userData.initialX);
+                mesh.position.x = mesh.userData.direction * (-15 - (mesh.userData.initialX * mesh.userData.direction));
                 mesh.position.y = -8 - mesh.userData.initialY;
                 mesh.position.z += getRandomArbitrary(-2, 2);
 
                 collisionObj.push(mesh)
                 scene.add(mesh)
             }
+        }
+
+        function UpdateParticles() {
+            particles.map((data, index) => {
+
+                var x = mouse.x * 13;
+                var y = mouse.y * 8;
+
+                var save = data.position.y;
+
+                var vec3 = new THREE.Vector3(data.position.x, data.position.y, data.position.z)
+                var vec3Mouse = new THREE.Vector3(x, y, data.position.z)
+
+                var distancia = vec3Mouse.distanceToSquared(vec3);
+
+                if (distancia < 50) {
+                    vec3.sub(vec3Mouse);
+                    vec3.normalize();
+                    vec3.multiplyScalar(4*deltaTime);
+                    data.position.add(vec3)
+                }
+
+                let value = MapRange(data.position.x, -15, 15, -1, 1)
+
+                data.position.y = save;
+
+                data.rotation.z += THREE.Math.degToRad(- deltaTime * data.userData.Velocidad * 15);
+                data.position.y += deltaTime * data.userData.Velocidad * VelocidadGlobal * .3;
+
+                var range = MapRange(data.userData.lifeTime, 0, 8, 0, 1)
+
+                data.material.color.setHSL(data.userData.HueInitial - range, .5, range)
+
+                data.scale.x = range * .5;
+                data.scale.y = range * .5;
+                data.scale.z = range * .5;
+
+                data.position.x += THREE.Math.degToRad(Math.sin(data.userData.lifeTime));
+
+                data.userData.lifeTime -= deltaTime;
+
+                if (data.userData.lifeTime < 0) {
+                    scene.remove(data);
+                    particles.splice(index, 1);
+                }
+            })
         }
 
         function UpdateBalls() {
@@ -431,16 +600,23 @@
                 var vec3 = new THREE.Vector3(data.position.x, data.position.y, data.position.z)
                 var vec3Mouse = new THREE.Vector3(x, y, data.position.z)
 
-                if (data.userData.isRayo) {
-                    vec3Mouse.sub(vec3);
-                    vec3Mouse.normalize();
-                    vec3Mouse.multiplyScalar(6 * deltaTime);
-                    data.position.add(vec3Mouse)
-                } else {
-                    vec3.sub(vec3Mouse);
-                    vec3.normalize();
-                    vec3.multiplyScalar(6 * deltaTime);
-                    data.position.add(vec3)
+                var distancia = vec3Mouse.distanceToSquared(vec3);
+
+                if (distancia < 50) {
+                    if (data.userData.isRayo) {
+                        vec3Mouse.sub(vec3);
+                        vec3Mouse.normalize();
+                        vec3Mouse.multiplyScalar(8 * deltaTime);
+                        data.position.add(vec3Mouse)
+                    } else {
+                        vec3.sub(vec3Mouse);
+                        vec3.normalize();
+                        vec3.multiplyScalar(10 * deltaTime);
+                        data.position.add(vec3)
+                    }
+                } else if (distancia > 50) {
+                    data.position.y += Math.sin(timerAcumulado) * deltaTime * 5
+                    data.position.x += Math.cos(timerAcumulado) * deltaTime * 5
                 }
 
                 if (data.position.x > 12)
@@ -454,7 +630,9 @@
 
                 data.rotation.y += THREE.Math.degToRad(deltaTime * 90);
 
-                if (!data.userData.notDeleted) {
+                data.userData.lifeTime -= deltaTime;
+
+                if (!data.userData.notDeleted || data.userData.lifeTime < 0) {
                     scene.remove(data);
                     collPowerUpObj.splice(index, 1);
                 }
@@ -525,6 +703,115 @@
 
                 envtexture = cubeTexture;
             });
+        }
+        function draw() {
+
+            timer++;
+
+            var sinTimer = Math.sin(timer / 500);
+            var cosTimer = Math.cos(timer / 100);
+            var tanTimer = Math.tan(timer / 1000);
+
+            // Paso #3
+            // Preparar todo para dibujar
+            // (Vertices, colores, transformaciones, etc...)
+
+            var verticesTri = [
+                -1.0, -1.0, 0.0,
+                0.0, 1.0, 0.0,
+                1.0, -1.0, 0.0
+            ];
+
+            // CREAMOS EL BUFFER
+
+            var vertexBufferTri = gl.createBuffer();
+
+            // ACTIVAMOS EL BUFFER
+
+            // Guardar los vertices en el ultimo buffer activado
+
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBufferTri);
+            gl.bufferData(gl.ARRAY_BUFFER,
+                new Float32Array(verticesTri),
+                gl.STATIC_DRAW);
+
+            // Creamos variables de ayuda que nos serviran para
+            // saber cuantos vertices hay en el arreglo y cada cuantos elementos
+            // del arreglo se consideran un vertice (x, y, z, x, y, z) = 2 vertices, 6 elementos
+
+            vertexBufferTri.itemSize = 3;
+            vertexBufferTri.numItems = verticesTri.length / vertexBufferTri.itemSize;
+
+
+            // Configurar viewport y "limpiar" pantalla
+            gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+
+            // Recordar que todo lo de matrices y vectores
+            // viene de la libreria GLMatrix NOOO de WebGL
+            var mvMatrix = mat4.create();
+            var pMatrix = mat4.create();
+
+            // Creamos la matriz de prespectiva
+            mat4.perspective(pMatrix,
+                45,
+                gl.viewportWidth / gl.viewportHeight,
+                0.1,
+                100);
+
+
+
+            // Transladamos
+
+
+            // Obtenemos las "referencias" a las variables del shader
+            var iPos = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+
+            var iPosFrag = gl.getAttribLocation(shaderProgram, "aColor");
+            // Habilitamos los arreglos de tipo vertice
+            gl.enableVertexAttribArray(iPos);
+            // Obtenemos las "referencias" a las variables del shader	
+            var iMVMatrix = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+            var iPMatrix = gl.getUniformLocation(shaderProgram, "uPMatrix");
+            // Enviamos la info a las variables en los shaders
+            gl.uniformMatrix4fv(iPMatrix, false, pMatrix);
+            // Seleccionamos el buffer de vertices
+            // Enviamos el buffer de vertices al vertex shader
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBufferTri);
+            // Enviamos el buffer de vertices al vertex shader
+            gl.vertexAttribPointer(iPos,
+                vertexBufferTri.itemSize,
+                gl.FLOAT,
+                false,
+                0,
+                0);
+            var i = 0;
+            var triangles = 50;
+            var filas = 15;
+            var vec3Scale = vec3.create();
+            vec3.set(vec3Scale, .1, .1, .5);
+            while (i < triangles) {
+                for (var j = 0; j < filas; j++) {
+
+
+                    mat4.identity(mvMatrix);
+                    mat4.rotateZ(mvMatrix, mvMatrix, dTOg(((i / triangles) * 360) + sinTimer * 360 * ((j * .1) + 1)));
+                    mat4.translate(mvMatrix, mvMatrix, [0, -3.7, (-14 + cosTimer * 5) + (j * .5 * cosTimer * cosTimer)]);
+                    mat4.rotateZ(mvMatrix, mvMatrix, dTOg(tanTimer * 720));
+                    mat4.scale(mvMatrix, mvMatrix, vec3Scale);
+                    gl.uniformMatrix4fv(iMVMatrix, false, mvMatrix);
+                    gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexBufferTri.numItems);
+
+                }
+                i++;
+            }
+        }
+
+        function dTOg(deg) {
+            return deg / (180 / Math.PI);
         }
         function loadSounds() {
 
@@ -599,8 +886,12 @@
 
 <body>
     <div id="sceneSection" style="position: absolute;">
+        <div id="canvasLoading">
+            <canvas width="1920" height="1080" id="CanvasWaiting">
 
-        <p id="puntuacion">Puntuacion: 0</p>
+            </canvas>
+        </div>
+        <p id="puntuacion"></p>
         <p id="puntuacionE"></p>
         <h1 id="gameOver"></h1>
         <p id="vidaActual"></p>
